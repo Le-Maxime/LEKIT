@@ -12,7 +12,7 @@
 1. **Выбор языка:** При первом запуске скрипт предлагает выбрать русский или английский язык.
 2. **Интерактивное меню:** Быстрое управление установленными пакетами.
 3. **Пакеты в комплекте:**
-   - **LEBOOT** — Настройка загрузчика (в разработке).
+   - **LEBOOT** — Установка и прошивка безопасного загрузчика U-Boot с веб-интерфейсом восстановления (failsafe Web UI), создание резервной копии текущего раздела FIP (загрузчика) прямо из меню, а также автоматическое считывание текущей установленной версии из флеш-памяти роутера.
    - **uFan** — Автоматическое управление охлаждением (кулером) и интеграция мониторинга вентилятора в LuCI.
    - **Proton2025** — Установка и удаление современной темы LuCI Proton2025 (автоматически скачивает последние релизы и поддерживает пакетные менеджеры `opkg` / `apk`).
 4. **Автоматическая установка:** При первом запуске скрипт сам копирует себя в систему для быстрого доступа.
@@ -45,7 +45,7 @@ Interactive menu-driven shell script for convenient installation, updates, and m
 1. **Language Selection:** Prompts for Russian or English on the first run.
 2. **Interactive Menu:** Convenient management of installed packages.
 3. **Included Packages:**
-   - **LEBOOT** — Bootloader configuration (under development).
+   - **LEBOOT** — Safe installation and flashing of U-Boot bootloader with failsafe Web UI, backup of the current FIP partition directly from the menu, and automatic retrieval of the currently installed version from the router's flash memory.
    - **uFan** — Automatic fan (cooling) management and Fan monitoring integration for LuCI.
    - **Proton2025** — Installation and removal of the modern LuCI Proton2025 theme (automatically pulls latest releases and supports `opkg` / `apk` package managers).
 4. **Automatic System Installation:** Copies itself to the system path on first run for quick access.
