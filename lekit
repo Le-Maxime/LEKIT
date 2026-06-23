@@ -11,38 +11,324 @@ FAN_LUCI_JS="/www/luci-static/resources/statistics/rrdtool/definitions/exec.js"
 COLLECTD_CONF="/etc/collectd.conf"
 UFAN_VER_FILE="/etc/ufan.version"
 LUCI_STATS_CONF="/etc/config/luci_statistics"
+LANG_FILE="/etc/lekit.lang"
 
-# --- АВТОМАТИЧЕСКАЯ УСТАНОВКА В СИСТЕМУ ---
-install_to_system() {
-  if [ -w "/usr/sbin" ]; then
-    # Если запущен локальный файл
-    if [ -f "$0" ] && [ "$0" != "/usr/sbin/lekit" ]; then
-      cp "$0" /usr/sbin/lekit 2>/dev/null
-      chmod +x /usr/sbin/lekit 2>/dev/null
-      echo "=================================================="
-      echo "  [LEKIT] Скрипт скопирован в /usr/sbin/lekit"
-      echo "  Теперь вы можете запускать его командой 'lekit'"
-      echo "=================================================="
-      echo ""
-    elif [ "$0" = "sh" ] || [ "$0" = "-sh" ] || [ "$0" = "bash" ] || [ ! -f "$0" ]; then
-      # Если запущено напрямую из curl/wget в shell
-      echo "=================================================="
-      echo "  [LEKIT] Скачивание и установка в /usr/sbin/lekit..."
-      wget --no-check-certificate -qO /usr/sbin/lekit "https://raw.githubusercontent.com/Le-Maxime/LEKIT/main/lekit" 2>/dev/null
-      chmod +x /usr/sbin/lekit 2>/dev/null
-      echo "  Установка завершена. Команда для запуска: lekit"
-      echo "=================================================="
-      echo ""
-    fi
-    
-    # Добавление в список sysupgrade
-    if [ -f "/usr/sbin/lekit" ] && [ -f "$CONF" ]; then
-      grep -qF "/usr/sbin/lekit" "$CONF" || echo "/usr/sbin/lekit" >> "$CONF" 2>/dev/null
+# --- ИНИЦИАЛИЗАЦИЯ ЯЗЫКА ---
+init_language() {
+  if [ -f "$LANG_FILE" ]; then
+    LEKIT_LANG=$(cat "$LANG_FILE")
+  else
+    echo "=================================================="
+    echo "  Выберите язык / Choose language:"
+    echo "  [1] Русский (RU)"
+    echo "  [2] English (EN)"
+    echo "=================================================="
+    printf "Ваш выбор / Your choice [1]: "
+    read -r lang_choice
+    case "$lang_choice" in
+      2) LEKIT_LANG="en" ;;
+      *) LEKIT_LANG="ru" ;;
+    esac
+    if [ -w "/etc" ]; then
+      echo "$LEKIT_LANG" > "$LANG_FILE" 2>/dev/null
     fi
   fi
 }
 
-# Запускаем автоустановку при первом запуске не из системного пути
+init_language
+
+# --- ЛОКАЛИЗАЦИЯ ---
+msg() {
+  local key="$1"
+  if [ "$LEKIT_LANG" = "en" ]; then
+    case "$key" in
+      "main_title") echo "LEKIT - Utility Kit for Comfast WR632AX" ;;
+      "main_version") echo "Version: $LEKIT_VERSION" ;;
+      "main_choose") echo "Select a package:" ;;
+      "main_updates") echo "Check LEKIT updates" ;;
+      "main_exit") echo "Exit" ;;
+      "invalid_input") echo "Invalid input. Please choose a number from the menu." ;;
+      "press_enter") echo "Press Enter to continue..." ;;
+      "yes_no_default_y") echo "(y/n) [y]: " ;;
+      "yes_no_default_n") echo "(y/n) [n]: " ;;
+      
+      "status_installed") echo "Installed" ;;
+      "status_not_installed") echo "Not installed" ;;
+      "status_unknown") echo "installed (version unknown)" ;;
+      
+      "leboot_title") echo "LEBOOT - Bootloader Setup for Comfast WR632AX" ;;
+      "leboot_status") echo "Current status:" ;;
+      "leboot_dev") echo "LEBOOT package is under development." ;;
+      "leboot_back") echo "Back to main menu" ;;
+      "leboot_not_avail") echo "This package is not available yet. Please check back later." ;;
+      
+      "ufan_title") echo "uFan - Cooling for Comfast WR-632AX" ;;
+      "ufan_status_comp") echo "Component status:" ;;
+      "ufan_service") echo "uFan Service" ;;
+      "ufan_monitoring") echo "Fan monitoring" ;;
+      "ufan_available") echo "available" ;;
+      "ufan_opt_install") echo "Install / Reinstall uFan" ;;
+      "ufan_opt_mon") echo "Install / Update Fan monitoring" ;;
+      "ufan_opt_remove") echo "Remove uFan and monitoring completely" ;;
+      "ufan_opt_updates") echo "Check uFan updates" ;;
+      "ufan_keep_sysupgrade") echo "Keep installed files during future router firmware upgrades?" ;;
+      "ufan_sysupgrade_done") echo "Files successfully added to save list ($CONF)." ;;
+      "ufan_sysupgrade_skip") echo "Files will NOT be kept during firmware upgrades." ;;
+      "ufan_install_start") echo "--- Installing uFan ---" ;;
+      "ufan_fetching_ver") echo "Determining latest uFan version on GitHub..." ;;
+      "ufan_installing_ver") echo "Installing uFan version" ;;
+      "ufan_stopping") echo "Stopping running ufan service..." ;;
+      "ufan_downloading_bin") echo "Downloading binary..." ;;
+      "ufan_download_err") echo "Error: Failed to download" ;;
+      "ufan_downloading_init") echo "Downloading init script..." ;;
+      "ufan_enabling") echo "Enabling and starting ufan service..." ;;
+      "ufan_install_success") echo "uFan installation completed successfully." ;;
+      
+      "ufan_mon_install_start") echo "--- Installing fan monitoring ---" ;;
+      "ufan_mon_deps") echo "Installing monitoring dependencies..." ;;
+      "ufan_mon_downloading_script") echo "Downloading pwmfan.sh script..." ;;
+      "ufan_mon_download_script_err") echo "Error: Failed to download pwmfan.sh. Monitoring will not be installed." ;;
+      "ufan_mon_downloading_js") echo "Downloading exec.js config..." ;;
+      "ufan_mon_download_js_err") echo "Error: Failed to download exec.js. Monitoring will not be installed." ;;
+      "ufan_mon_configuring_collectd") echo "Configuring collectd..." ;;
+      "ufan_mon_restarting_stats") echo "Restarting luci_statistics service..." ;;
+      "ufan_mon_restarting_collectd") echo "Restarting collectd service..." ;;
+      "ufan_mon_collectd_not_found") echo "Warning: Neither UCI luci_statistics nor collectd.conf found. collectd not configured." ;;
+      "ufan_mon_success") echo "Fan monitoring installation completed successfully." ;;
+      
+      "ufan_uninstall_start") echo "--- Complete removal of uFan and monitoring ---" ;;
+      "ufan_uninstall_confirm") echo "Are you sure you want to remove all components?" ;;
+      "ufan_uninstall_cancelled") echo "Removal cancelled." ;;
+      "ufan_uninstall_stopping") echo "Stopping ufan service..." ;;
+      "ufan_uninstall_files") echo "Removing fan monitoring files..." ;;
+      "ufan_uninstall_uci") echo "Removing pwmfan settings from UCI..." ;;
+      "ufan_uninstall_collectd") echo "Cleaning collectd.conf..." ;;
+      "ufan_uninstall_sysupgrade") echo "Cleaning entries in $CONF..." ;;
+      "ufan_uninstall_success") echo "All components successfully removed." ;;
+      
+      "ufan_update_title") echo "--- Checking uFan updates ---" ;;
+      "ufan_update_checking") echo "Checking latest uFan version on GitHub..." ;;
+      "ufan_update_available") echo "New uFan version available:" ;;
+      "ufan_update_prompt") echo "Update uFan binary?" ;;
+      "ufan_updating") echo "Updating uFan binary..." ;;
+      "ufan_update_success") echo "uFan service successfully updated to version" ;;
+      "ufan_update_err") echo "Error: Failed to download updated uFan binary." ;;
+      "ufan_update_latest") echo "You already have the latest uFan version" ;;
+      "ufan_update_github_err") echo "Failed to get uFan version from GitHub." ;;
+      
+      "proton_title") echo "Proton2025 - LuCI Theme" ;;
+      "proton_status") echo "Theme status:" ;;
+      "proton_installed_ver") echo "Theme Proton2025:" ;;
+      "proton_opt_install") echo "Install / Update Proton2025 theme" ;;
+      "proton_opt_remove") echo "Remove Proton2025 theme completely" ;;
+      "proton_opt_updates") echo "Check theme updates" ;;
+      
+      "theme_install_start") echo "--- Installing Proton2025 theme ---" ;;
+      "theme_fetching_ver") echo "Requesting latest version from GitHub..." ;;
+      "theme_ver_err") echo "Error: Failed to determine version on GitHub. Check internet connection." ;;
+      "theme_latest_ver") echo "Latest available version:" ;;
+      "theme_apk_err") echo "Error: Failed to find APK link in releases." ;;
+      "theme_downloading_apk") echo "Downloading APK file..." ;;
+      "theme_download_apk_err") echo "Error: Failed to download APK." ;;
+      "theme_installing_apk") echo "Installing via apk..." ;;
+      "theme_success") echo "Theme successfully installed!" ;;
+      "theme_install_pkg_err") echo "Error installing package." ;;
+      "theme_ipk_err") echo "Error: Failed to find IPK link in releases." ;;
+      "theme_downloading_ipk") echo "Downloading IPK file..." ;;
+      "theme_download_ipk_err") echo "Error: Failed to download IPK." ;;
+      "theme_installing_ipk") echo "Installing via opkg..." ;;
+      "theme_no_pkg_manager") echo "Error: Package manager apk or opkg not found." ;;
+      
+      "theme_uninstall_start") echo "--- Removing Proton2025 theme ---" ;;
+      "theme_uninstall_confirm") echo "Are you sure you want to remove Proton2025 theme?" ;;
+      "theme_uninstall_cancelled") echo "Removal cancelled." ;;
+      "theme_uninstall_files") echo "Removing files..." ;;
+      "theme_uninstall_reset") echo "Resetting LuCI theme to default (bootstrap)..." ;;
+      "theme_uninstall_success") echo "Theme successfully removed." ;;
+      
+      "theme_update_title") echo "--- Checking theme updates ---" ;;
+      "theme_update_fetching") echo "Requesting latest theme version from GitHub..." ;;
+      "theme_update_available") echo "New theme version available:" ;;
+      "theme_update_prompt") echo "Update theme?" ;;
+      "theme_update_latest") echo "You already have the latest theme version" ;;
+      "theme_update_github_err") echo "Failed to check theme version on GitHub." ;;
+      
+      "lekit_update_title") echo "--- Checking LEKIT updates ---" ;;
+      "lekit_update_available") echo "New LEKIT version available:" ;;
+      "lekit_update_prompt") echo "Update LEKIT?" ;;
+      "lekit_updating") echo "Updating LEKIT..." ;;
+      "lekit_update_success") echo "LEKIT successfully updated. Please restart it." ;;
+      "lekit_update_latest") echo "You already have the latest LEKIT version" ;;
+      "lekit_update_err") echo "Error: Failed to download LEKIT version from GitHub." ;;
+      "lekit_update_parse_err") echo "Failed to parse version in downloaded file." ;;
+    esac
+  else
+    case "$key" in
+      "main_title") echo "LEKIT - Набор утилит для Comfast WR632AX" ;;
+      "main_version") echo "Версия: $LEKIT_VERSION" ;;
+      "main_choose") echo "Выберите пакет:" ;;
+      "main_updates") echo "Проверить обновления LEKIT" ;;
+      "main_exit") echo "Выход" ;;
+      "invalid_input") echo "Неверный ввод. Пожалуйста, выберите число из меню." ;;
+      "press_enter") echo "Нажмите Enter, чтобы продолжить..." ;;
+      "yes_no_default_y") echo "(y/n) [y]: " ;;
+      "yes_no_default_n") echo "(y/n) [n]: " ;;
+      
+      "status_installed") echo "Установлен" ;;
+      "status_not_installed") echo "Не установлен" ;;
+      "status_unknown") echo "установлена (версия неизвестна)" ;;
+      
+      "leboot_title") echo "LEBOOT - Настройка загрузчика Comfast WR632AX" ;;
+      "leboot_status") echo "Текущий статус:" ;;
+      "leboot_dev") echo "Пакет LEBOOT находится в разработке." ;;
+      "leboot_back") echo "Назад в главное меню" ;;
+      "leboot_not_avail") echo "Этот пакет пока недоступен. Вернитесь позже." ;;
+      
+      "ufan_title") echo "uFan - Охлаждение для Comfast WR-632AX" ;;
+      "ufan_status_comp") echo "Текущий статус компонентов:" ;;
+      "ufan_service") echo "Служба uFan" ;;
+      "ufan_monitoring") echo "Мониторинг вентилятора" ;;
+      "ufan_available") echo "доступна" ;;
+      "ufan_opt_install") echo "Установить / Переустановить uFan" ;;
+      "ufan_opt_mon") echo "Установить / Обновить мониторинг кулера" ;;
+      "ufan_opt_remove") echo "Удалить uFan и мониторинг полностью" ;;
+      "ufan_opt_updates") echo "Проверить обновления uFan" ;;
+      "ufan_keep_sysupgrade") echo "Сохранять установленные файлы при будущем обновлении прошивки роутера?" ;;
+      "ufan_sysupgrade_done") echo "Файлы успешно добавлены в список сохранения ($CONF)." ;;
+      "ufan_sysupgrade_skip") echo "Файлы НЕ будут сохраняться при обновлении прошивки." ;;
+      "ufan_install_start") echo "--- Установка uFan ---" ;;
+      "ufan_fetching_ver") echo "Определение последней версии uFan на GitHub..." ;;
+      "ufan_installing_ver") echo "Установка uFan версии" ;;
+      "ufan_stopping") echo "Остановка запущенной службы ufan..." ;;
+      "ufan_downloading_bin") echo "Скачивание исполняемого файла..." ;;
+      "ufan_download_err") echo "Ошибка: Не удалось скачать" ;;
+      "ufan_downloading_init") echo "Скачивание скрипта инициализации..." ;;
+      "ufan_enabling") echo "Включение и запуск службы ufan..." ;;
+      "ufan_install_success") echo "Установка ufan успешно завершена." ;;
+      
+      "ufan_mon_install_start") echo "--- Установка мониторинга кулера ---" ;;
+      "ufan_mon_deps") echo "Установка зависимости мониторинга..." ;;
+      "ufan_mon_downloading_script") echo "Скачивание скрипта pwmfan.sh..." ;;
+      "ufan_mon_download_script_err") echo "Ошибка: Не удалось скачать pwmfan.sh. Мониторинг вентилятора не будет установлен." ;;
+      "ufan_mon_downloading_js") echo "Скачивание конфигурации rrdtool/definitions/exec.js..." ;;
+      "ufan_mon_download_js_err") echo "Ошибка: Не удалось скачать exec.js. Мониторинг вентилятора не будет установлен." ;;
+      "ufan_mon_configuring_collectd") echo "Настройка collectd..." ;;
+      "ufan_mon_restarting_stats") echo "Перезапуск службы luci_statistics..." ;;
+      "ufan_mon_restarting_collectd") echo "Перезапуск службы collectd..." ;;
+      "ufan_mon_collectd_not_found") echo "Предупреждение: ни UCI luci_statistics, ни collectd.conf не найдены. collectd не настроен." ;;
+      "ufan_mon_success") echo "Установка мониторинга вентилятора успешно завершена." ;;
+      
+      "ufan_uninstall_start") echo "--- Полное удаление uFan и мониторинга кулера ---" ;;
+      "ufan_uninstall_confirm") echo "Вы действительно хотите удалить все компоненты?" ;;
+      "ufan_uninstall_cancelled") echo "Удаление отменено." ;;
+      "ufan_uninstall_stopping") echo "Остановка службы ufan..." ;;
+      "ufan_uninstall_files") echo "Удаление файлов мониторинга вентилятора..." ;;
+      "ufan_uninstall_uci") echo "Удаление настроек pwmfan из UCI..." ;;
+      "ufan_uninstall_collectd") echo "Очистка collectd.conf..." ;;
+      "ufan_uninstall_sysupgrade") echo "Очистка записей в $CONF..." ;;
+      "ufan_uninstall_success") echo "Все компоненты успешно удалены." ;;
+      
+      "ufan_update_title") echo "--- Проверка обновлений uFan ---" ;;
+      "ufan_update_checking") echo "Проверка последней версии uFan на GitHub..." ;;
+      "ufan_update_available") echo "Доступна новая версия uFan:" ;;
+      "ufan_update_prompt") echo "Обновить бинарный файл uFan?" ;;
+      "ufan_updating") echo "Обновление бинарного файла uFan..." ;;
+      "ufan_update_success") echo "Служба uFan успешно обновлена до версии" ;;
+      "ufan_update_err") echo "Ошибка: Не удалось загрузить обновленный бинарный файл uFan." ;;
+      "ufan_update_latest") echo "У вас установлена актуальная версия uFan" ;;
+      "ufan_update_github_err") echo "Не удалось получить версию uFan с GitHub." ;;
+      
+      "proton_title") echo "Proton2025 - Тема оформления LuCI" ;;
+      "proton_status") echo "Текущий статус:" ;;
+      "proton_installed_ver") echo "Тема Proton2025:" ;;
+      "proton_opt_install") echo "Установить / Обновить тему Proton2025" ;;
+      "proton_opt_remove") echo "Удалить тему Proton2025 полностью" ;;
+      "proton_opt_updates") echo "Проверить обновления темы" ;;
+      
+      "theme_install_start") echo "--- Установка темы Proton2025 ---" ;;
+      "theme_fetching_ver") echo "Запрос последней версии с GitHub..." ;;
+      "theme_ver_err") echo "Ошибка: Не удалось определить версию на GitHub. Проверьте интернет-соединение." ;;
+      "theme_latest_ver") echo "Последняя доступная версия:" ;;
+      "theme_apk_err") echo "Ошибка: Не удалось найти ссылку на APK в релизах." ;;
+      "theme_downloading_apk") echo "Скачивание APK файла..." ;;
+      "theme_download_apk_err") echo "Ошибка: Не удалось скачать APK." ;;
+      "theme_installing_apk") echo "Установка через apk..." ;;
+      "theme_success") echo "Тема успешно установлена!" ;;
+      "theme_install_pkg_err") echo "Ошибка установки пакета." ;;
+      "theme_ipk_err") echo "Ошибка: Не удалось найти ссылку на IPK в релизах." ;;
+      "theme_downloading_ipk") echo "Скачивание IPK файла..." ;;
+      "theme_download_ipk_err") echo "Ошибка: Не удалось скачать IPK." ;;
+      "theme_installing_ipk") echo "Установка через opkg..." ;;
+      "theme_no_pkg_manager") echo "Ошибка: Пакетный менеджер apk или opkg не найден." ;;
+      
+      "theme_uninstall_start") echo "--- Удаление темы Proton2025 ---" ;;
+      "theme_uninstall_confirm") echo "Вы действительно хотите удалить тему Proton2025?" ;;
+      "theme_uninstall_cancelled") echo "Удаление отменено." ;;
+      "theme_uninstall_files") echo "Удаление файлов..." ;;
+      "theme_uninstall_reset") echo "Сброс темы LuCI к теме по умолчанию (bootstrap)..." ;;
+      "theme_uninstall_success") echo "Тема успешно удалена." ;;
+      
+      "theme_update_title") echo "--- Проверка обновлений темы ---" ;;
+      "theme_update_fetching") echo "Запрос последней версии темы с GitHub..." ;;
+      "theme_update_available") echo "Доступна новая версия темы:" ;;
+      "theme_update_prompt") echo "Обновить тему?" ;;
+      "theme_update_latest") echo "У вас установлена актуальная версия темы" ;;
+      "theme_update_github_err") echo "Не удалось проверить версию темы на GitHub." ;;
+      
+      "lekit_update_title") echo "--- Проверка обновлений LEKIT ---" ;;
+      "lekit_update_available") echo "Доступна новая версия:" ;;
+      "lekit_update_prompt") echo "Обновить LEKIT?" ;;
+      "lekit_updating") echo "Обновление LEKIT..." ;;
+      "lekit_update_success") echo "LEKIT успешно обновлен. Пожалуйста, запустите его заново." ;;
+      "lekit_update_latest") echo "У вас установлена последняя версия LEKIT" ;;
+      "lekit_update_err") echo "Ошибка: Не удалось загрузить версию LEKIT с GitHub." ;;
+      "lekit_update_parse_err") echo "Не удалось распознать версию в загруженном файле." ;;
+    esac
+  fi
+}
+
+
+# --- АВТОМАТИЧЕСКАЯ УСТАНОВКА В СИСТЕМУ ---
+install_to_system() {
+  if [ -w "/usr/sbin" ]; then
+    if [ -f "$0" ] && [ "$0" != "/usr/sbin/lekit" ]; then
+      cp "$0" /usr/sbin/lekit 2>/dev/null
+      chmod +x /usr/sbin/lekit 2>/dev/null
+      echo "=================================================="
+      if [ "$LEKIT_LANG" = "en" ]; then
+        echo "  [LEKIT] Script copied to /usr/sbin/lekit"
+        echo "  Now you can run it using 'lekit' command"
+      else
+        echo "  [LEKIT] Скрипт скопирован в /usr/sbin/lekit"
+        echo "  Теперь вы можете запускать его командой 'lekit'"
+      fi
+      echo "=================================================="
+      echo ""
+    elif [ "$0" = "sh" ] || [ "$0" = "-sh" ] || [ "$0" = "bash" ] || [ ! -f "$0" ]; then
+      echo "=================================================="
+      if [ "$LEKIT_LANG" = "en" ]; then
+        echo "  [LEKIT] Downloading and installing to /usr/sbin/lekit..."
+      else
+        echo "  [LEKIT] Скачивание и установка в /usr/sbin/lekit..."
+      fi
+      wget --no-check-certificate -qO /usr/sbin/lekit "https://raw.githubusercontent.com/Le-Maxime/LEKIT/main/lekit" 2>/dev/null
+      chmod +x /usr/sbin/lekit 2>/dev/null
+      if [ "$LEKIT_LANG" = "en" ]; then
+        echo "  Installation completed. Command to run: lekit"
+      else
+        echo "  Установка завершена. Команда для запуска: lekit"
+      fi
+      echo "=================================================="
+      echo ""
+    fi
+    
+    if [ -f "/usr/sbin/lekit" ] && [ -f "$CONF" ]; then
+      grep -qF "/usr/sbin/lekit" "$CONF" || echo "/usr/sbin/lekit" >> "$CONF" 2>/dev/null
+      grep -qF "$LANG_FILE" "$CONF" || echo "$LANG_FILE" >> "$CONF" 2>/dev/null
+    fi
+  fi
+}
+
 if [ "$0" != "/usr/sbin/lekit" ]; then
   install_to_system
 fi
@@ -56,51 +342,46 @@ get_installed_theme_version() {
     elif command -v opkg >/dev/null; then
       opkg status luci-theme-proton2025 2>/dev/null | grep -i "^Version:" | cut -d' ' -f2
     else
-      echo "установлена (версия неизвестна)"
+      msg "status_unknown"
     fi
   else
-    echo "не установлена"
+    msg "status_not_installed"
   fi
 }
 
-clear_luci_cache() {
-  echo "Очистка кэша LuCI..."
-  rm -rf /tmp/luci-indexcache /tmp/luci-modulecache 2>/dev/null
-}
-
 install_theme() {
-  echo -e "\n--- Установка темы Proton2025 ---"
-  echo "Запрос последней версии с GitHub..."
+  echo "$(msg theme_install_start)"
+  echo "$(msg theme_fetching_ver)"
 
   release_json=$(wget --no-check-certificate -qO- https://api.github.com/repos/ChesterGoodiny/luci-theme-proton2025/releases/latest)
   theme_latest_version=$(echo "$release_json" | tr ',' '\n' | grep "^\"tag_name\":" | cut -d'"' -f4)
 
   if [ -z "$theme_latest_version" ]; then
-    echo "Ошибка: Не удалось определить версию на GitHub. Проверьте интернет-соединение."
+    echo "$(msg theme_ver_err)"
     return 1
   fi
 
-  echo "Последняя доступная версия: $theme_latest_version"
+  echo "$(msg theme_latest_ver) $theme_latest_version"
 
   if command -v apk >/dev/null; then
     apk_url=$(echo "$release_json" | tr ',' '\n' | grep "browser_download_url" | grep -i "\.apk" | cut -d'"' -f4)
     if [ -z "$apk_url" ]; then
-      echo "Ошибка: Не удалось найти ссылку на APK в релизах."
+      echo "$(msg theme_apk_err)"
       return 1
     fi
-    echo "Скачивание APK файла..."
+    echo "$(msg theme_downloading_apk)"
     TEMP_APK="/tmp/luci-theme-proton2025.apk"
     if ! wget --no-check-certificate -qO "$TEMP_APK" "$apk_url"; then
-      echo "Ошибка: Не удалось скачать APK."
+      echo "$(msg theme_download_apk_err)"
       return 1
     fi
-    echo "Установка через apk..."
+    echo "$(msg theme_installing_apk)"
     if apk add --allow-untrusted "$TEMP_APK"; then
-      echo "Тема успешно установлена!"
+      echo "$(msg theme_success)"
       rm -f "$TEMP_APK"
       clear_luci_cache
     else
-      echo "Ошибка установки пакета."
+      echo "$(msg theme_install_pkg_err)"
       rm -f "$TEMP_APK"
       return 1
     fi
@@ -108,82 +389,81 @@ install_theme() {
   elif command -v opkg >/dev/null; then
     ipk_url=$(echo "$release_json" | tr ',' '\n' | grep "browser_download_url" | grep -i "\.ipk" | cut -d'"' -f4)
     if [ -z "$ipk_url" ]; then
-      echo "Ошибка: Не удалось найти ссылку на IPK в релизах."
+      echo "$(msg theme_ipk_err)"
       return 1
     fi
-    echo "Скачивание IPK файла..."
+    echo "$(msg theme_downloading_ipk)"
     TEMP_IPK="/tmp/luci-theme-proton2025.ipk"
     if ! wget --no-check-certificate -qO "$TEMP_IPK" "$ipk_url"; then
-      echo "Ошибка: Не удалось скачать IPK."
+      echo "$(msg theme_download_ipk_err)"
       return 1
     fi
-    echo "Установка через opkg..."
+    echo "$(msg theme_installing_ipk)"
     if opkg install "$TEMP_IPK"; then
-      echo "Тема успешно установлена!"
+      echo "$(msg theme_success)"
       rm -f "$TEMP_IPK"
       clear_luci_cache
     else
-      echo "Ошибка установки пакета."
+      echo "$(msg theme_install_pkg_err)"
       rm -f "$TEMP_IPK"
       return 1
     fi
   else
-    echo "Ошибка: Пакетный менеджер apk или opkg не найден."
+    echo "$(msg theme_no_pkg_manager)"
     return 1
   fi
 }
 
 uninstall_theme() {
-  echo -e "\n--- Удаление темы Proton2025 ---"
+  echo "$(msg theme_uninstall_start)"
   if [ ! -d "$THEME_DIR" ]; then
-    echo "Тема Proton2025 не установлена."
+    echo "$(msg proton_installed_ver) $(msg status_not_installed)"
     return 0
   fi
 
-  printf "Вы действительно хотите удалить тему Proton2025? (y/n) [n]: "
+  printf "$(msg theme_uninstall_confirm) $(msg yes_no_default_n)"
   read -r confirm
   if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
-    echo "Удаление отменено."
+    echo "$(msg theme_uninstall_cancelled)"
     return 0
   fi
 
-  echo "Удаление файлов..."
+  echo "$(msg theme_uninstall_files)"
   if command -v apk >/dev/null; then
     apk del luci-theme-proton2025
   elif command -v opkg >/dev/null; then
     opkg remove luci-theme-proton2025
   else
-    echo "Пакетный менеджер не найден. Принудительное удаление файлов..."
     rm -rf "$THEME_DIR"
   fi
 
   rm -f /etc/config/proton2025
 
   if [ "$(uci get luci.main.mediaurlbase 2>/dev/null)" = "/luci-static/proton2025" ]; then
-    echo "Сброс темы LuCI к теме по умолчанию (bootstrap)..."
+    echo "$(msg theme_uninstall_reset)"
     uci set luci.main.mediaurlbase="/luci-static/bootstrap" 2>/dev/null
     uci commit luci 2>/dev/null
   fi
 
   clear_luci_cache
-  echo "Тема успешно удалена."
+  echo "$(msg theme_uninstall_success)"
 }
 
 check_theme_updates() {
   local is_startup="$1"
   if [ "$is_startup" != "startup" ]; then
-    echo -e "\n--- Проверка обновлений темы ---"
+    echo "$(msg theme_update_title)"
   fi
 
   if [ ! -d "$THEME_DIR" ]; then
     if [ "$is_startup" != "startup" ]; then
-      echo "Тема Proton2025 не установлена."
+      echo "$(msg proton_installed_ver) $(msg status_not_installed)"
     fi
     return 0
   fi
 
   if [ "$is_startup" != "startup" ]; then
-    echo "Запрос последней версии темы с GitHub..."
+    echo "$(msg theme_update_fetching)"
   fi
 
   theme_latest_version=$(wget --no-check-certificate -qO- https://api.github.com/repos/ChesterGoodiny/luci-theme-proton2025/releases/latest | tr ',' '\n' | grep "^\"tag_name\":" | cut -d'"' -f4)
@@ -194,19 +474,19 @@ check_theme_updates() {
     theme_clean_installed=$(echo "$theme_installed_version" | cut -d'-' -f1 | cut -d'_' -f1 | sed 's/[^0-9.]//g')
 
     if [ "$theme_clean_latest" != "$theme_clean_installed" ] && [ -n "$theme_clean_latest" ]; then
-      printf "\n[Обновление темы] Доступна новая версия темы: $theme_latest_version (установлена: $theme_installed_version).\nОбновить тему? (y/n) [y]: "
+      printf "\n$(msg theme_update_available) $theme_latest_version ($(msg status_installed): $theme_installed_version).\n$(msg theme_update_prompt) $(msg yes_no_default_y)"
       read -r update_choice
       if [ "$update_choice" != "n" ] && [ "$update_choice" != "N" ]; then
         install_theme
       fi
     else
       if [ "$is_startup" != "startup" ]; then
-        echo "У вас установлена актуальная версия темы ($theme_installed_version)."
+        echo "$(msg theme_update_latest) ($theme_installed_version)."
       fi
     fi
   else
     if [ "$is_startup" != "startup" ]; then
-      echo "Не удалось проверить версию темы на GitHub."
+      echo "$(msg theme_update_github_err)"
     fi
   fi
 }
@@ -215,155 +495,113 @@ proton_menu() {
   while true; do
     installed_ver=$(get_installed_theme_version)
     echo "=================================================="
-    echo "  Proton2025 - Тема оформления LuCI"
+    echo "  $(msg proton_title)"
     echo "=================================================="
-    echo "Текущий статус:"
-    echo "  Тема Proton2025:       $installed_ver"
+    echo "$(msg proton_status)"
+    echo "  $(msg proton_installed_ver)       $installed_ver"
     echo "--------------------------------------------------"
-    echo "Выберите действие:"
-    echo "  [1] Установить / Обновить тему Proton2025"
-    echo "  [2] Удалить тему Proton2025 полностью"
-    echo "  [99] Проверить обновления темы"
-    echo "  [0] Назад в главное меню"
+    echo "$(msg main_choose)"
+    echo "  [1] $(msg proton_opt_install)"
+    echo "  [2] $(msg proton_opt_remove)"
+    echo "  [99] $(msg proton_opt_updates)"
+    echo "  [0] $(msg leboot_back)"
     echo "=================================================="
-    printf "Ваш выбор: "
+    printf "Ваш выбор / Your choice: "
     read -r choice
     case "$choice" in
       1) install_theme ;;
       2) uninstall_theme ;;
       99) check_theme_updates ;;
       0) return ;;
-      *) echo "Неверный ввод. Пожалуйста, выберите число из меню." ;;
+      *) echo "$(msg invalid_input)" ;;
     esac
-    printf "\nНажмите Enter, чтобы продолжить..."
+    printf "\n$(msg press_enter)"
     read -r _
   done
 }
 
 
 # --- ФУНКЦИИ ДЛЯ UFAN ---
-get_installed_ufan_version() {
-  if [ -f "$BIN" ]; then
-    if [ -f "$UFAN_VER_FILE" ]; then
-      cat "$UFAN_VER_FILE"
-    else
-      echo "2.0.2"
-    fi
-  else
-    echo "не установлен"
-  fi
-}
-
-fetch_latest_ufan_version() {
-  wget --no-check-certificate -qO- https://api.github.com/repos/andros-ua/ufan/releases/latest | sed -n 's/.*"tag_name":"\([^"]*\)".*/\1/p'
-}
-
 check_ufan_status() {
   if [ -f "$BIN" ] && [ -f "$INIT" ]; then
     local_ufan_ver=$(get_installed_ufan_version)
-    status_ufan="Установлен ($local_ufan_ver)"
+    status_ufan="$(msg status_installed) ($local_ufan_ver)"
   else
-    status_ufan="Не установлен"
+    status_ufan="$(msg status_not_installed)"
   fi
 
   if [ -f "$FAN_SCRIPT" ] && [ -f "$FAN_LUCI_JS" ]; then
-    status_fan="Установлен"
+    status_fan="$(msg status_installed)"
   else
-    status_fan="Не установлен"
-  fi
-}
-
-ask_sysupgrade() {
-  printf "\nСохранять установленные файлы при будущем обновлении прошивки роутера? (y/n) [по умолчанию: y]: "
-  read -r keep
-  if [ "$keep" != "n" ] && [ "$keep" != "N" ]; then
-    if [ -f "$BIN" ]; then
-      grep -qF "$BIN" "$CONF" || echo "$BIN" >> "$CONF"
-    fi
-    if [ -f "$INIT" ]; then
-      grep -qF "$INIT" "$CONF" || echo "$INIT" >> "$CONF"
-    fi
-    if [ -f "$UFAN_VER_FILE" ]; then
-      grep -qF "$UFAN_VER_FILE" "$CONF" || echo "$UFAN_VER_FILE" >> "$CONF"
-    fi
-    if [ -f "$FAN_SCRIPT" ]; then
-      grep -qF "$COLLECTD_CONF" "$CONF" || echo "$COLLECTD_CONF" >> "$CONF"
-      grep -qF "$FAN_SCRIPT" "$CONF" || echo "$FAN_SCRIPT" >> "$CONF"
-      grep -qF "$FAN_LUCI_JS" "$CONF" || echo "$FAN_LUCI_JS" >> "$CONF"
-    fi
-    echo "Файлы успешно добавлены в список сохранения ($CONF)."
-  else
-    echo "Файлы НЕ будут сохраняться при обновлении прошивки."
+    status_fan="$(msg status_not_installed)"
   fi
 }
 
 install_ufan() {
-  echo -e "\n--- Установка uFan ---"
-  echo "Определение последней версии uFan на GitHub..."
+  echo -e "\n$(msg ufan_install_start)"
+  echo "$(msg ufan_fetching_ver)"
   latest_ufan=$(fetch_latest_ufan_version)
   if [ -z "$latest_ufan" ]; then
     latest_ufan="$UFAN_VERSION"
   fi
   
-  echo "Установка uFan версии $latest_ufan..."
+  echo "$(msg ufan_installing_ver) $latest_ufan..."
 
   if [ -f "$BIN" ] || [ -f "$INIT" ]; then
-    echo "Остановка запущенной службы ufan..."
+    echo "$(msg ufan_stopping)"
     service ufan stop 2>/dev/null
   fi
 
-  echo "Скачивание исполняемого файла..."
+  echo "$(msg ufan_downloading_bin)"
   if ! wget --no-check-certificate -qO "$BIN" "https://github.com/andros-ua/ufan/raw/refs/heads/main/usr/sbin/ufan"; then
-    echo "Ошибка: Не удалось скачать $BIN."
+    echo "$(msg ufan_download_err) $BIN."
     return 1
   fi
   chmod +x "$BIN"
 
-  echo "Скачивание скрипта инициализации..."
+  echo "$(msg ufan_downloading_init)"
   if ! wget --no-check-certificate -qO "$INIT" "https://github.com/andros-ua/ufan/raw/refs/heads/main/etc/init.d/ufan"; then
-    echo "Ошибка: Не удалось скачать $INIT."
+    echo "$(msg ufan_download_err) $INIT."
     return 1
   fi
   chmod +x "$INIT"
 
   echo "$latest_ufan" > "$UFAN_VER_FILE"
 
-  echo "Включение и запуск службы ufan..."
+  echo "$(msg ufan_enabling)"
   service ufan enable 2>/dev/null || /etc/init.d/ufan enable 2>/dev/null
   service ufan start 2>/dev/null || /etc/init.d/ufan start 2>/dev/null
 
-  echo "Установка ufan успешно завершена."
+  echo "$(msg ufan_install_success)"
   ask_sysupgrade
 }
 
 install_fan_monitoring() {
-  echo -e "\n--- Установка мониторинга кулера ---"
-  echo "Установка зависимостей мониторинга..."
+  echo -e "\n$(msg ufan_mon_install_start)"
+  echo "$(msg ufan_mon_deps)"
   if command -v apk >/dev/null; then
     apk update 2>/dev/null
     apk add luci-app-statistics collectd-mod-exec
   elif command -v opkg >/dev/null; then
     opkg update
     opkg install luci-app-statistics collectd-mod-exec
-  else
-    echo "Предупреждение: не найден пакетный менеджер (apk или opkg). Пропуск установки пакетов."
   fi
 
   wget_ok=1
-  echo "Скачивание скрипта pwmfan.sh..."
+  echo "$(msg ufan_mon_downloading_script)"
   mkdir -p "$(dirname "$FAN_SCRIPT")"
   if ! wget --no-check-certificate -qO "$FAN_SCRIPT" "https://github.com/andros-ua/ufan/raw/refs/heads/main/usr/share/collectd/pwmfan.sh"; then
-    echo "Ошибка: Не удалось скачать $FAN_SCRIPT. Мониторинг вентилятора не будет установлен."
+    echo "$(msg ufan_mon_download_script_err)"
     wget_ok=0
   else
     chmod +x "$FAN_SCRIPT"
   fi
 
   if [ "$wget_ok" -eq 1 ]; then
-    echo "Скачивание конфигурации rrdtool/definitions/exec.js..."
+    echo "$(msg ufan_mon_downloading_js)"
     mkdir -p "$(dirname "$FAN_LUCI_JS")"
     if ! wget --no-check-certificate -qO "$FAN_LUCI_JS" "https://github.com/andros-ua/ufan/raw/refs/heads/main/www/luci-static/resources/statistics/rrdtool/definitions/exec.js"; then
-      echo "Ошибка: Не удалось скачать $FAN_LUCI_JS. Мониторинг вентилятора не будет установлен."
+      echo "$(msg ufan_mon_download_js_err)"
       wget_ok=0
       rm -f "$FAN_SCRIPT"
     fi
@@ -371,7 +609,7 @@ install_fan_monitoring() {
 
   if [ "$wget_ok" -eq 1 ]; then
     if [ -f "$LUCI_STATS_CONF" ]; then
-      echo "Настройка collectd через UCI (luci_statistics)..."
+      echo "$(msg ufan_mon_configuring_collectd)"
       uci set luci_statistics.collectd_exec=statistics
       uci set luci_statistics.collectd_exec.enable='1'
       uci set luci_statistics.pwmfan=collectd_exec_input
@@ -379,11 +617,11 @@ install_fan_monitoring() {
       uci set luci_statistics.pwmfan.cmduser="nobody"
       uci set luci_statistics.pwmfan.cmdgroup="nogroup"
       uci commit luci_statistics
-      echo "Перезапуск службы luci_statistics..."
+      echo "$(msg ufan_mon_restarting_stats)"
       /etc/init.d/luci_statistics restart 2>/dev/null
     elif [ -f "$COLLECTD_CONF" ]; then
       if ! grep -qF "$FAN_SCRIPT" "$COLLECTD_CONF"; then
-        echo "Настройка $COLLECTD_CONF..."
+        echo "$(msg ufan_mon_configuring_collectd)"
         if ! grep -q "^[ 	]*LoadPlugin[ 	][ 	]*exec" "$COLLECTD_CONF"; then
           echo -e "\nLoadPlugin exec" >> "$COLLECTD_CONF"
         fi
@@ -396,12 +634,12 @@ install_fan_monitoring() {
 #END_PWMFAN
 EOF
       fi
-      echo "Перезапуск службы collectd..."
+      echo "$(msg ufan_mon_restarting_collectd)"
       service collectd restart 2>/dev/null || /etc/init.d/collectd restart 2>/dev/null
     else
-      echo "Предупреждение: ни UCI luci_statistics, ни $COLLECTD_CONF не найдены. collectd не настроен."
+      echo "$(msg ufan_mon_collectd_not_found)"
     fi
-    echo "Установка мониторинга вентилятора успешно завершена."
+    echo "$(msg ufan_mon_success)"
     ask_sysupgrade
   else
     return 1
@@ -409,38 +647,37 @@ EOF
 }
 
 uninstall_ufan() {
-  echo -e "\n--- Полное удаление uFan и мониторинга кулера ---"
-  printf "Вы действительно хотите удалить все компоненты? (y/n) [n]: "
+  echo -e "\n$(msg ufan_uninstall_start)"
+  printf "$(msg ufan_uninstall_confirm) $(msg yes_no_default_n)"
   read -r confirm
   if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
-    echo "Удаление отменено."
+    echo "$(msg ufan_uninstall_cancelled)"
     return 0
   fi
 
-  echo "Остановка службы ufan..."
+  echo "$(msg ufan_uninstall_stopping)"
   service ufan stop 2>/dev/null
   service ufan disable 2>/dev/null
   rm -f "$BIN" "$INIT" "$UFAN_VER_FILE"
 
-  echo "Удаление файлов мониторинга вентилятора..."
+  echo "$(msg ufan_uninstall_files)"
   rm -f "$FAN_SCRIPT" "$FAN_LUCI_JS"
 
   if [ -f "$LUCI_STATS_CONF" ]; then
-    echo "Удаление настроек pwmfan из UCI..."
+    echo "$(msg ufan_uninstall_uci)"
     uci delete luci_statistics.pwmfan 2>/dev/null
     uci commit luci_statistics 2>/dev/null
     /etc/init.d/luci_statistics restart 2>/dev/null
   fi
 
   if [ -f "$COLLECTD_CONF" ]; then
-    echo "Очистка $COLLECTD_CONF..."
+    echo "$(msg ufan_uninstall_collectd)"
     sed -i '/#BEGIN_PWMFAN/,/#END_PWMFAN/d' "$COLLECTD_CONF" 2>/dev/null
     sed -i '\#/usr/share/collectd/pwmfan.sh#d' "$COLLECTD_CONF" 2>/dev/null
-    echo "Перезапуск службы collectd..."
     service collectd restart 2>/dev/null || /etc/init.d/collectd restart 2>/dev/null
   fi
 
-  echo "Очистка записей в $CONF..."
+  echo "$(msg ufan_uninstall_sysupgrade)"
   sed -i '\#/usr/sbin/ufan#d' "$CONF" 2>/dev/null
   sed -i '\#/etc/init.d/ufan#d' "$CONF" 2>/dev/null
   sed -i '\#/etc/ufan.version#d' "$CONF" 2>/dev/null
@@ -448,24 +685,24 @@ uninstall_ufan() {
   sed -i '\#/usr/share/collectd/pwmfan.sh#d' "$CONF" 2>/dev/null
   sed -i '\#/www/luci-static/resources/statistics/rrdtool/definitions/exec.js#d' "$CONF" 2>/dev/null
 
-  echo "Все компоненты успешно удалены."
+  echo "$(msg ufan_uninstall_success)"
 }
 
 check_ufan_updates() {
   local is_startup="$1"
   if [ "$is_startup" != "startup" ]; then
-    echo -e "\n--- Проверка обновлений uFan ---"
+    echo "$(msg ufan_update_title)"
   fi
 
   if [ ! -f "$BIN" ]; then
     if [ "$is_startup" != "startup" ]; then
-      echo "Служба uFan не установлена в системе. Пропуск."
+      echo "$(msg ufan_service): $(msg status_not_installed)"
     fi
     return 0
   fi
 
   if [ "$is_startup" != "startup" ]; then
-    echo "Проверка последней версии uFan на GitHub..."
+    echo "$(msg ufan_update_checking)"
   fi
 
   latest_ufan=$(fetch_latest_ufan_version)
@@ -475,29 +712,29 @@ check_ufan_updates() {
     ufan_clean_installed=$(echo "$installed_ufan" | cut -d'-' -f1 | cut -d'_' -f1 | sed 's/[^0-9.]//g')
 
     if [ "$ufan_clean_latest" != "$ufan_clean_installed" ] && [ -n "$ufan_clean_latest" ]; then
-      printf "\n[Обновление uFan] Доступна новая версия uFan: $latest_ufan (установлена: $installed_ufan).\nОбновить бинарный файл uFan? (y/n) [y]: "
+      printf "\n$(msg ufan_update_available) $latest_ufan ($(msg status_installed): $installed_ufan).\n$(msg ufan_update_prompt) $(msg yes_no_default_y)"
       read -r ufan_update_choice
       if [ "$ufan_update_choice" != "n" ] && [ "$ufan_update_choice" != "N" ]; then
-        echo "Обновление бинарного файла uFan..."
+        echo "$(msg ufan_updating)"
         service ufan stop 2>/dev/null
         if wget --no-check-certificate -qO "$BIN" "https://github.com/andros-ua/ufan/raw/refs/heads/main/usr/sbin/ufan"; then
           chmod +x "$BIN"
           echo "$latest_ufan" > "$UFAN_VER_FILE"
           service ufan start 2>/dev/null
-          echo "Служба uFan успешно обновлена до версии $latest_ufan."
+          echo "$(msg ufan_update_success) $latest_ufan."
         else
-          echo "Ошибка: Не удалось загрузить обновленный бинарный файл uFan."
+          echo "$(msg ufan_update_err)"
           service ufan start 2>/dev/null
         fi
       fi
     else
       if [ "$is_startup" != "startup" ]; then
-        echo "У вас установлена актуальная версия uFan ($installed_ufan)."
+        echo "$(msg ufan_update_latest) ($installed_ufan)."
       fi
     fi
   else
     if [ "$is_startup" != "startup" ]; then
-      echo "Не удалось получить версию uFan с GitHub."
+      echo "$(msg ufan_update_github_err)"
     fi
   fi
 }
@@ -506,20 +743,20 @@ ufan_menu() {
   while true; do
     check_ufan_status
     echo "=================================================="
-    echo "  uFan - Охлаждение для Comfast WR-632AX"
+    echo "  $(msg ufan_title)"
     echo "=================================================="
-    echo "Текущий статус компонентов:"
-    echo "  Служба uFan:            $status_ufan (доступна v$UFAN_VERSION)"
-    echo "  Мониторинг вентилятора: $status_fan"
+    echo "$(msg ufan_status_comp)"
+    echo "  $(msg ufan_service):            $status_ufan"
+    echo "  $(msg ufan_monitoring): $status_fan"
     echo "--------------------------------------------------"
-    echo "Выберите действие:"
-    echo "  [1] Установить / Переустановить uFan"
-    echo "  [2] Установить / Обновить мониторинг кулера"
-    echo "  [3] Удалить uFan и мониторинг полностью"
-    echo "  [99] Проверить обновления uFan"
-    echo "  [0] Назад в главное меню"
+    echo "$(msg main_choose)"
+    echo "  [1] $(msg ufan_opt_install)"
+    echo "  [2] $(msg ufan_opt_mon)"
+    echo "  [3] $(msg ufan_opt_remove)"
+    echo "  [99] $(msg ufan_opt_updates)"
+    echo "  [0] $(msg leboot_back)"
     echo "=================================================="
-    printf "Ваш выбор: "
+    printf "Ваш выбор / Your choice: "
     read -r choice
     case "$choice" in
       1) install_ufan ;;
@@ -527,9 +764,9 @@ ufan_menu() {
       3) uninstall_ufan ;;
       99) check_ufan_updates ;;
       0) return ;;
-      *) echo "Неверный ввод. Пожалуйста, выберите число из меню." ;;
+      *) echo "$(msg invalid_input)" ;;
     esac
-    printf "\nНажмите Enter, чтобы продолжить..."
+    printf "\n$(msg press_enter)"
     read -r _
   done
 }
@@ -539,21 +776,21 @@ ufan_menu() {
 leboot_menu() {
   while true; do
     echo "=================================================="
-    echo "  LEBOOT - Настройка загрузчика Comfast WR632AX"
+    echo "  $(msg leboot_title)"
     echo "=================================================="
-    echo "Текущий статус:"
-    echo "  Пакет LEBOOT находится в разработке."
+    echo "$(msg leboot_status)"
+    echo "  $(msg leboot_dev)"
     echo "--------------------------------------------------"
-    echo "Выберите действие:"
-    echo "  [0] Назад в главное меню"
+    echo "$(msg main_choose)"
+    echo "  [0] $(msg leboot_back)"
     echo "=================================================="
-    printf "Ваш выбор: "
+    printf "Ваш выбор / Your choice: "
     read -r choice
     case "$choice" in
       0) return ;;
-      *) echo "Этот пакет пока недоступен. Вернитесь позже." ;;
+      *) echo "$(msg leboot_not_avail)" ;;
     esac
-    printf "\nНажмите Enter, чтобы продолжить..."
+    printf "\n$(msg press_enter)"
     read -r _
   done
 }
@@ -563,7 +800,7 @@ leboot_menu() {
 check_lekit_updates() {
   local is_startup="$1"
   if [ "$is_startup" != "startup" ]; then
-    echo -e "\n--- Проверка обновлений LEKIT ---"
+    echo -e "\n$(msg lekit_update_title)"
   fi
   TEMP_FILE="/tmp/lekit_new"
 
@@ -571,33 +808,33 @@ check_lekit_updates() {
     new_version=$(grep "^LEKIT_VERSION=" "$TEMP_FILE" | cut -d'"' -f2)
     if [ -n "$new_version" ]; then
       if [ "$new_version" != "$LEKIT_VERSION" ]; then
-        printf "\n[Обновление LEKIT] Доступна новая версия: $new_version (текущая: $LEKIT_VERSION).\nОбновить LEKIT? (y/n) [y]: "
+        printf "\n$(msg lekit_update_available) $new_version ($(msg main_version): $LEKIT_VERSION).\n$(msg lekit_update_prompt) $(msg yes_no_default_y)"
         read -r update_choice
         if [ "$update_choice" != "n" ] && [ "$update_choice" != "N" ]; then
-          echo "Обновление LEKIT..."
+          echo "$(msg lekit_updating)"
           mv "$TEMP_FILE" "$0"
           chmod +x "$0"
           if [ "$0" != "/usr/sbin/lekit" ] && [ -f "/usr/sbin/lekit" ]; then
             cp "$0" /usr/sbin/lekit
             chmod +x /usr/sbin/lekit
           fi
-          echo "LEKIT успешно обновлен. Пожалуйста, запустите его заново."
+          echo "$(msg lekit_update_success)"
           exit 0
         fi
       else
         if [ "$is_startup" != "startup" ]; then
-          echo "У вас установлена последняя версия LEKIT ($LEKIT_VERSION)."
+          echo "$(msg lekit_update_latest) ($LEKIT_VERSION)."
         fi
       fi
     else
       if [ "$is_startup" != "startup" ]; then
-        echo "Не удалось распознать версию в загруженном файле."
+        echo "$(msg lekit_update_parse_err)"
       fi
     fi
     rm -f "$TEMP_FILE"
   else
     if [ "$is_startup" != "startup" ]; then
-      echo "Ошибка: Не удалось загрузить версию LEKIT с GitHub."
+      echo "$(msg lekit_update_err)"
     fi
   fi
 }
@@ -606,23 +843,23 @@ check_lekit_updates() {
 # --- ГЛАВНОЕ МЕНЮ ---
 show_main_menu() {
   echo "=================================================="
-  echo "  LEKIT - Набор утилит для Comfast WR632AX"
-  echo "  Версия: $LEKIT_VERSION"
+  echo "  $(msg main_title)"
+  echo "  $(msg main_version)"
   echo "=================================================="
-  echo "Выберите пакет:"
+  echo "$(msg main_choose)"
   echo "  [1] LEBOOT"
   echo "  [2] uFan"
   echo "  [3] Proton2025"
   echo ""
   echo ""
   echo ""
-  echo "  [99] Проверить обновления LEKIT"
+  echo "  [99] $(msg main_updates)"
   echo ""
   echo ""
   echo ""
-  echo "  [0] Выход"
+  echo "  [0] $(msg main_exit)"
   echo "=================================================="
-  printf "Ваш выбор: "
+  printf "Ваш выбор / Your choice: "
 }
 
 while true; do
@@ -634,13 +871,17 @@ while true; do
     3) proton_menu ;;
     99) check_lekit_updates ;;
     0)
-      echo "Выход."
+      if [ "$LEKIT_LANG" = "en" ]; then
+        echo "Exit."
+      else
+        echo "Выход."
+      fi
       exit 0
       ;;
     *)
-      echo "Неверный ввод. Пожалуйста, выберите число из меню."
+      echo "$(msg invalid_input)"
       ;;
   esac
-  printf "\nНажмите Enter, чтобы продолжить..."
+  printf "\n$(msg press_enter)"
   read -r _
 done

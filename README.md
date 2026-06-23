@@ -1,20 +1,25 @@
-# LEKIT - Набор утилит для Comfast WR632AX
+# LEKIT - Набор утилит для Comfast WR632AX / Utility Kit for Comfast WR632AX
 
-Интерактивный скрипт-меню для удобной установки, обновления и управления дополнительным программным обеспечением на Wi-Fi роутере **Comfast CF-WR632AX** под управлением OpenWrt.
-
-## Возможности
-1. **Интерактивное меню:** Быстрое управление установленными пакетами.
-2. **Пакеты в комплекте:**
-   - **LEBOOT** — Настройка загрузчика (в разработке).
-   - **uFan** — Автоматическое управление охлаждением (кулером) и интеграция мониторинга вентилятора в LuCI.
-   - **Proton2025** — Установка и удаление современной темы LuCI Proton2025 (автоматически скачивает последние релизы и поддерживает пакетные менеджеры `opkg` / `apk`).
-3. **Автоматическая установка:** При первом запуске скрипт сам копирует себя в систему для быстрого доступа.
-4. **Сохранение при обновлении прошивки (sysupgrade):** Автоматически добавляется в конфигурацию sysupgrade, чтобы скрипт остался на роутере после обновления прошивки.
-5. **Проверка обновлений:** Проверяет обновления самого LEKIT и установленных пакетов.
+[Русский](#русский) | [English](#english)
 
 ---
 
-## Установка и запуск
+## Русский
+
+Интерактивный скрипт-меню для удобной установки, обновления и управления дополнительным программным обеспечением на Wi-Fi роутере **Comfast CF-WR632AX** под управлением OpenWrt.
+
+### Возможности
+1. **Выбор языка:** При первом запуске скрипт предлагает выбрать русский или английский язык.
+2. **Интерактивное меню:** Быстрое управление установленными пакетами.
+3. **Пакеты в комплекте:**
+   - **LEBOOT** — Настройка загрузчика (в разработке).
+   - **uFan** — Автоматическое управление охлаждением (кулером) и интеграция мониторинга вентилятора в LuCI.
+   - **Proton2025** — Установка и удаление современной темы LuCI Proton2025 (автоматически скачивает последние релизы и поддерживает пакетные менеджеры `opkg` / `apk`).
+4. **Автоматическая установка:** При первом запуске скрипт сам копирует себя в систему для быстрого доступа.
+5. **Сохранение при обновлении прошивки (sysupgrade):** Автоматически добавляется в конфигурацию sysupgrade, чтобы скрипт остался на роутере после обновления прошивки.
+6. **Проверка обновлений:** Проверяет обновления самого LEKIT и установленных пакетов.
+
+### Установка и запуск
 
 Подключитесь к роутеру по SSH и выполните следующую команду:
 
@@ -25,6 +30,39 @@ wget --no-check-certificate -qO lekit "https://raw.githubusercontent.com/Le-Maxi
 При первом запуске утилита автоматически скопирует себя в `/usr/sbin/lekit` и настроит автосохранение.
 
 После этого для запуска меню из любого места достаточно просто ввести:
+
+```bash
+lekit
+```
+
+---
+
+## English
+
+Interactive menu-driven shell script for convenient installation, updates, and management of additional software on the **Comfast CF-WR632AX** Wi-Fi router running OpenWrt.
+
+### Features
+1. **Language Selection:** Prompts for Russian or English on the first run.
+2. **Interactive Menu:** Convenient management of installed packages.
+3. **Included Packages:**
+   - **LEBOOT** — Bootloader configuration (under development).
+   - **uFan** — Automatic fan (cooling) management and Fan monitoring integration for LuCI.
+   - **Proton2025** — Installation and removal of the modern LuCI Proton2025 theme (automatically pulls latest releases and supports `opkg` / `apk` package managers).
+4. **Automatic System Installation:** Copies itself to the system path on first run for quick access.
+5. **sysupgrade Persistence:** Automatically adds itself to the sysupgrade configuration to persist across firmware upgrades.
+6. **Update Verification:** Check for updates of LEKIT itself and the installed packages.
+
+### Installation and Launch
+
+Connect to your router via SSH and run the following command:
+
+```bash
+wget --no-check-certificate -qO lekit "https://raw.githubusercontent.com/Le-Maxime/LEKIT/main/lekit" && chmod +x lekit && ./lekit
+```
+
+On first run, the utility will automatically copy itself to `/usr/sbin/lekit` and configure system persistence.
+
+Afterwards, to run the menu from anywhere, simply enter:
 
 ```bash
 lekit
