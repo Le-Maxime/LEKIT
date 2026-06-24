@@ -1190,7 +1190,7 @@ check_lekit_updates() {
     new_version=$(grep "^LEKIT_VERSION=" "$TEMP_FILE" | cut -d'"' -f2)
     if [ -n "$new_version" ]; then
       if [ "$new_version" != "$LEKIT_VERSION" ]; then
-        printf "\n$(msg lekit_update_available) $new_version ($(msg main_version): $LEKIT_VERSION).\n$(msg lekit_update_prompt) $(msg yes_no_default_y)"
+        printf "\n$(msg lekit_update_available) $new_version ($(msg main_version)).\n$(msg lekit_update_prompt) $(msg yes_no_default_y)"
         read -r update_choice
         if [ "$update_choice" != "n" ] && [ "$update_choice" != "N" ]; then
           echo "$(msg lekit_updating)"
