@@ -986,6 +986,8 @@ flash_leboot() {
     fi
   fi
 
+  local fip_file=""
+
   # Интерактивное скачивание с GitHub
   echo ""
   printf "$(msg leboot_dl_prompt) $(msg yes_no_default_n)"
@@ -1007,55 +1009,54 @@ flash_leboot() {
         return 1
       fi
       
-      local urls=$(echo "$json" | grep -oE 'https://github.com/[^"]+' | grep -iE '\.fip$' | grep -i 'LEBOOT' || true)
+      local url=$(echo "$json" | grep -oE 'https://github.com/[^"]+' | grep -iE '\.fip$' | grep -i 'LEBOOT' | head -n 1)
 
-      if [ -z "$urls" ]; then
-        urls=$(echo "$json" | grep -oE 'https://github.com/[^"]+' | grep -E '\.(bin|fip)$' | grep -i 'cf-wr632ax' || true)
+      if [ -z "$url" ]; then
+        url=$(echo "$json" | grep -oE 'https://github.com/[^"]+' | grep -E '\.(bin|fip)$' | grep -i 'cf-wr632ax' | head -n 1)
       fi
 
-      if [ -z "$urls" ]; then
-        urls=$(echo "$json" | grep -oE 'https://github.com/[^"]+' | grep -E '\.(bin|fip)$' || true)
+      if [ -z "$url" ]; then
+        url=$(echo "$json" | grep -oE 'https://github.com/[^"]+' | grep -E '\.(bin|fip)$' | head -n 1)
       fi
 
-      if [ -z "$urls" ]; then
+      if [ -z "$url" ]; then
         echo "$(msg leboot_files_no_fip)"
         return 1
       fi
       
-      echo "$(msg leboot_files_found)"
-      for url in $urls; do
-        filename=$(basename "$url")
-        echo "  - $filename"
-      done
+      local filename=$(basename "$url")
+      echo "$(msg leboot_downloading) $filename..."
       
-      for url in $urls; do
-        filename=$(basename "$url")
-        echo "$(msg leboot_downloading) $filename..."
-        if command -v curl >/dev/null 2>&1; then
-          curl -L -o "$filename" "$url"
-        else
-          wget -O "$filename" --no-check-certificate "$url"
+      fip_file="/tmp/leboot-flash.fip"
+      if command -v curl >/dev/null 2>&1; then
+        if ! curl -L -o "$fip_file" "$url"; then
+          echo "Error: curl download failed!" >&2
+          return 1
         fi
-        echo "$filename $(msg leboot_download_ok)"
-      done
+      else
+        if ! wget -O "$fip_file" --no-check-certificate "$url"; then
+          echo "Error: wget download failed!" >&2
+          return 1
+        fi
+      fi
+      echo "$filename $(msg leboot_download_ok)"
       ;;
     *)
       echo "$(msg leboot_local_files)"
+      fip_file=$(select_file "LEBOOT-*.fip" "Найдены файлы LEBOOT FIP / Found LEBOOT FIP files:")
+      if [ -z "$fip_file" ]; then
+        fip_file=$(select_file "*.fip" "Найдены файлы .fip / Found .fip files:")
+      fi
+      if [ -z "$fip_file" ]; then
+        fip_file=$(select_file "*fip*.bin" "Найдены файлы для FIP / Found files for FIP:")
+      fi
+      if [ -z "$fip_file" ]; then
+        fip_file=$(select_file "*u-boot*.bin" "Найдены файлы U-Boot / Found U-Boot files:")
+      fi
       ;;
   esac
 
-  local fip_file=$(select_file "LEBOOT-*.fip" "Найдены файлы LEBOOT FIP / Found LEBOOT FIP files:")
-  if [ -z "$fip_file" ]; then
-    fip_file=$(select_file "*.fip" "Найдены файлы .fip / Found .fip files:")
-  fi
-  if [ -z "$fip_file" ]; then
-    fip_file=$(select_file "*fip*.bin" "Найдены файлы для FIP / Found files for FIP:")
-  fi
-  if [ -z "$fip_file" ]; then
-    fip_file=$(select_file "*u-boot*.bin" "Найдены файлы U-Boot / Found U-Boot files:")
-  fi
-
-  if [ -z "$fip_file" ]; then
+  if [ -z "$fip_file" ] || [ ! -f "$fip_file" ]; then
     echo "Error: No firmware file found!" >&2
     return 1
   else
