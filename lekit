@@ -1,6 +1,6 @@
 #!/bin/sh
 
-LEKIT_VERSION="1.2"
+LEKIT_VERSION="1.2.3"
 THEME_DIR="/www/luci-static/proton2025"
 UFAN_VERSION="2.0.2"
 BIN="/usr/sbin/ufan"
