@@ -866,15 +866,17 @@ get_installed_leboot_version() {
     return 1
   fi
 
-  local ver=""
+  local raw_ver=""
   if command -v strings >/dev/null; then
-    ver=$(strings "/dev/$mtd_fip" 2>/dev/null | grep -m 1 -E "U-Boot [0-9]{4}\.[0-9]{2}|LEBOOT")
+    raw_ver=$(strings "/dev/$mtd_fip" 2>/dev/null | grep -m 1 -E "U-Boot [0-9]{4}\.[0-9]{2}|LEBOOT")
   else
-    ver=$(dd if="/dev/$mtd_fip" bs=1k count=1024 2>/dev/null | tr -cd '\11\12\15\40-\176' | grep -o -m 1 -E "U-Boot [0-9]{4}\.[0-9]{2}[^ ]*|LEBOOT-[^ ]*")
+    raw_ver=$(dd if="/dev/$mtd_fip" bs=1k count=1024 2>/dev/null | tr -cd '\11\12\15\40-\176' | grep -o -m 1 -E "U-Boot [0-9]{4}\.[0-9]{2}[^ ]*|LEBOOT-[^ ]*")
   fi
 
-  if [ -n "$ver" ]; then
-    echo "$ver" | tr -d '\r\n'
+  if echo "$raw_ver" | grep -q "LEBOOT"; then
+    echo "$raw_ver" | grep -o -E "LEBOOT-v[0-9]+(\.[0-9]+)+" | head -n 1
+  elif echo "$raw_ver" | grep -q "U-Boot"; then
+    echo "$raw_ver" | grep -o -E "U-Boot [0-9]{4}\.[0-9]{2}(\.[0-9]+)*" | head -n 1
   else
     msg "status_unknown"
   fi
