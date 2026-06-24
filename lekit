@@ -48,6 +48,7 @@ msg() {
       "main_updates") echo "Check LEKIT updates" ;;
       "main_exit") echo "Exit" ;;
       "invalid_input") echo "Invalid input. Please choose a number from the menu." ;;
+      "your_choice") echo "Your choice: " ;;
       "press_enter") echo "Press Enter to continue..." ;;
       "yes_no_default_y") echo "(y/n) [y]: " ;;
       "yes_no_default_n") echo "(y/n) [n]: " ;;
@@ -208,6 +209,7 @@ msg() {
       "main_updates") echo "Проверить обновления LEKIT" ;;
       "main_exit") echo "Выход" ;;
       "invalid_input") echo "Неверный ввод. Пожалуйста, выберите число из меню." ;;
+      "your_choice") echo "Ваш выбор: " ;;
       "press_enter") echo "Нажмите Enter, чтобы продолжить..." ;;
       "yes_no_default_y") echo "(y/n) [y]: " ;;
       "yes_no_default_n") echo "(y/n) [n]: " ;;
@@ -596,7 +598,7 @@ proton_menu() {
     echo "  [99] $(msg proton_opt_updates)"
     echo "  [0] $(msg leboot_back)"
     echo "=================================================="
-    printf "Ваш выбор / Your choice: "
+    printf "$(msg your_choice)"
     read -r choice
     case "$choice" in
       1) install_theme ;;
@@ -847,7 +849,7 @@ ufan_menu() {
     echo "  [99] $(msg ufan_opt_updates)"
     echo "  [0] $(msg leboot_back)"
     echo "=================================================="
-    printf "Ваш выбор / Your choice: "
+    printf "$(msg your_choice)"
     read -r choice
     case "$choice" in
       1) install_ufan ;;
@@ -941,6 +943,7 @@ select_file() {
 }
 
 flash_leboot() {
+  local mode="$1"
   # Проверяем наличие разделов MTD
   if [ ! -f /proc/mtd ]; then
     echo "Error: Not running on an OpenWrt router!" >&2
@@ -987,11 +990,17 @@ flash_leboot() {
   fi
 
   local fip_file=""
+  local dl_confirm=""
 
-  # Интерактивное скачивание с GitHub
-  echo ""
-  printf "$(msg leboot_dl_prompt) $(msg yes_no_default_n)"
-  read dl_confirm < /dev/tty
+  if [ "$mode" = "auto" ]; then
+    dl_confirm="y"
+  else
+    # Интерактивное скачивание с GitHub
+    echo ""
+    printf "$(msg leboot_dl_prompt) $(msg yes_no_default_n)"
+    read dl_confirm < /dev/tty
+  fi
+
   case "$dl_confirm" in
     y|Y|yes|YES)
       echo "$(msg leboot_dl_check)"
@@ -1131,7 +1140,7 @@ check_leboot_updates() {
       printf "\n$(msg leboot_update_available) $latest_version ($(msg status_installed): $installed_version).\n$(msg leboot_update_prompt) $(msg yes_no_default_y)"
       read -r update_choice
       if [ "$update_choice" != "n" ] && [ "$update_choice" != "N" ]; then
-        flash_leboot
+        flash_leboot "auto"
       fi
     else
       if [ "$is_startup" != "startup" ]; then
@@ -1164,7 +1173,7 @@ leboot_menu() {
     echo "  [99] $(msg leboot_update_title)"
     echo "  [0] $(msg leboot_back)"
     echo "=================================================="
-    printf "Ваш выбор / Your choice: "
+    printf "$(msg your_choice)"
     read -r choice
     case "$choice" in
       1) flash_leboot ;;
@@ -1242,7 +1251,7 @@ show_main_menu() {
   echo ""
   echo "  [0] $(msg main_exit)"
   echo "=================================================="
-  printf "Ваш выбор / Your choice: "
+  printf "$(msg your_choice)"
 }
 
 while true; do
