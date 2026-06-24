@@ -49,6 +49,7 @@ msg() {
       "main_exit") echo "Exit" ;;
       "invalid_input") echo "Invalid input. Please choose a number from the menu." ;;
       "your_choice") echo "Your choice: " ;;
+      "opt_github") echo "Open package GitHub" ;;
       "press_enter") echo "Press Enter to continue..." ;;
       "yes_no_default_y") echo "(y/n) [y]: " ;;
       "yes_no_default_n") echo "(y/n) [n]: " ;;
@@ -210,6 +211,7 @@ msg() {
       "main_exit") echo "Выход" ;;
       "invalid_input") echo "Неверный ввод. Пожалуйста, выберите число из меню." ;;
       "your_choice") echo "Ваш выбор: " ;;
+      "opt_github") echo "Открыть GitHub пакета" ;;
       "press_enter") echo "Нажмите Enter, чтобы продолжить..." ;;
       "yes_no_default_y") echo "(y/n) [y]: " ;;
       "yes_no_default_n") echo "(y/n) [n]: " ;;
@@ -377,6 +379,18 @@ find_mtd_partition_name() {
   local name="$1"
   local label=$(grep -i "\"$name\"" /proc/mtd | cut -d'"' -f2)
   echo "$label"
+}
+
+open_url() {
+  local url="$1"
+  echo -e "\nGitHub: $url\n"
+  if command -v xdg-open >/dev/null 2>&1; then
+    xdg-open "$url" 2>/dev/null &
+  elif command -v open >/dev/null 2>&1; then
+    open "$url" 2>/dev/null &
+  elif command -v cmd.exe >/dev/null 2>&1; then
+    cmd.exe /c start "" "$url" 2>/dev/null &
+  fi
 }
 
 
@@ -595,6 +609,7 @@ proton_menu() {
     echo "$(msg main_choose)"
     echo "  [1] $(msg proton_opt_install)"
     echo "  [2] $(msg proton_opt_remove)"
+    echo "  [88] $(msg opt_github)"
     echo "  [99] $(msg proton_opt_updates)"
     echo "  [0] $(msg leboot_back)"
     echo "=================================================="
@@ -603,6 +618,7 @@ proton_menu() {
     case "$choice" in
       1) install_theme ;;
       2) uninstall_theme ;;
+      88) open_url "https://github.com/ChesterGoodiny/luci-theme-proton2025" ;;
       99) check_theme_updates ;;
       0) return ;;
       *) echo "$(msg invalid_input)" ;;
@@ -846,6 +862,7 @@ ufan_menu() {
     echo "  [1] $(msg ufan_opt_install)"
     echo "  [2] $(msg ufan_opt_mon)"
     echo "  [3] $(msg ufan_opt_remove)"
+    echo "  [88] $(msg opt_github)"
     echo "  [99] $(msg ufan_opt_updates)"
     echo "  [0] $(msg leboot_back)"
     echo "=================================================="
@@ -855,6 +872,7 @@ ufan_menu() {
       1) install_ufan ;;
       2) install_fan_monitoring ;;
       3) uninstall_ufan ;;
+      88) open_url "https://github.com/andros-ua/ufan" ;;
       99) check_ufan_updates ;;
       0) return ;;
       *) echo "$(msg invalid_input)" ;;
@@ -1170,6 +1188,7 @@ leboot_menu() {
     echo "$(msg main_choose)"
     echo "  [1] $(msg leboot_opt_flash)"
     echo "  [2] $(msg leboot_opt_backup)"
+    echo "  [88] $(msg opt_github)"
     echo "  [99] $(msg leboot_update_title)"
     echo "  [0] $(msg leboot_back)"
     echo "=================================================="
@@ -1178,6 +1197,7 @@ leboot_menu() {
     case "$choice" in
       1) flash_leboot ;;
       2) backup_fip ;;
+      88) open_url "https://github.com/Le-Maxime/LEBOOT" ;;
       99) check_leboot_updates ;;
       0) return ;;
       *) echo "$(msg invalid_input)" ;;
