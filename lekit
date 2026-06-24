@@ -93,6 +93,11 @@ msg() {
       "leboot_backup_start") echo "Creating backup of partition" ;;
       "leboot_backup_success") echo "Backup successfully created and saved to /tmp/fip-backup.bin" ;;
       "leboot_backup_err") echo "Error creating backup!" ;;
+      "leboot_update_title") echo "Check LEBOOT updates" ;;
+      "leboot_update_available") echo "New LEBOOT version available:" ;;
+      "leboot_update_prompt") echo "Update LEBOOT?" ;;
+      "leboot_update_latest") echo "You already have the latest LEBOOT version" ;;
+      "leboot_update_err") echo "Failed to check LEBOOT version on GitHub." ;;
       
       # uFan
       "ufan_title") echo "uFan - Cooling for Comfast WR-632AX" ;;
@@ -248,6 +253,11 @@ msg() {
       "leboot_backup_start") echo "Создание резервной копии раздела" ;;
       "leboot_backup_success") echo "Резервная копия успешно создана и сохранена в /tmp/fip-backup.bin" ;;
       "leboot_backup_err") echo "Ошибка создания резервной копии!" ;;
+      "leboot_update_title") echo "Проверить обновления LEBOOT" ;;
+      "leboot_update_available") echo "Доступна новая версия LEBOOT:" ;;
+      "leboot_update_prompt") echo "Обновить LEBOOT?" ;;
+      "leboot_update_latest") echo "У вас установлена актуальная версия LEBOOT" ;;
+      "leboot_update_err") echo "Не удалось проверить версию LEBOOT на GitHub." ;;
       
       # uFan
       "ufan_title") echo "uFan - Охлаждение для Comfast WR-632AX" ;;
@@ -1084,6 +1094,57 @@ flash_leboot() {
   fi
 }
 
+check_leboot_updates() {
+  local is_startup="$1"
+  if [ "$is_startup" != "startup" ]; then
+    echo -e "\n--- $(msg leboot_update_title) ---"
+  fi
+
+  local mtd_fip=$(find_mtd_partition "fip")
+  if [ -z "$mtd_fip" ]; then
+    if [ "$is_startup" != "startup" ]; then
+      echo "$(msg leboot_fip_not_found)"
+    fi
+    return 0
+  fi
+
+  if [ "$is_startup" != "startup" ]; then
+    echo "$(msg leboot_dl_check)"
+  fi
+
+  local github_api="https://api.github.com/repos/Le-Maxime/LEBOOT/releases/latest"
+  local json=""
+  if command -v curl >/dev/null 2>&1; then
+    json=$(curl -s -L "$github_api")
+  else
+    json=$(wget -qO- --no-check-certificate "$github_api" || true)
+  fi
+
+  local latest_version=$(echo "$json" | tr ',' '\n' | grep "^\"tag_name\":" | cut -d'"' -f4)
+
+  if [ -n "$latest_version" ]; then
+    local installed_version=$(get_installed_leboot_version)
+    local clean_latest=$(echo "$latest_version" | sed 's/LEBOOT-//g' | sed 's/v//g' | cut -d'-' -f1 | cut -d'_' -f1 | sed 's/[^0-9.]//g')
+    local clean_installed=$(echo "$installed_version" | sed 's/LEBOOT-//g' | sed 's/v//g' | cut -d'-' -f1 | cut -d'_' -f1 | sed 's/[^0-9.]//g')
+
+    if [ "$clean_latest" != "$clean_installed" ] && [ -n "$clean_latest" ] && [ "$installed_version" != "$(msg status_unknown)" ] && [ "$installed_version" != "$(msg status_not_installed)" ]; then
+      printf "\n$(msg leboot_update_available) $latest_version ($(msg status_installed): $installed_version).\n$(msg leboot_update_prompt) $(msg yes_no_default_y)"
+      read -r update_choice
+      if [ "$update_choice" != "n" ] && [ "$update_choice" != "N" ]; then
+        flash_leboot
+      fi
+    else
+      if [ "$is_startup" != "startup" ]; then
+        echo "$(msg leboot_update_latest) ($installed_version)."
+      fi
+    fi
+  else
+    if [ "$is_startup" != "startup" ]; then
+      echo "$(msg leboot_update_err)"
+    fi
+  fi
+}
+
 leboot_menu() {
   while true; do
     local mtd_fip=$(find_mtd_partition "fip")
@@ -1100,6 +1161,7 @@ leboot_menu() {
     echo "$(msg main_choose)"
     echo "  [1] $(msg leboot_opt_flash)"
     echo "  [2] $(msg leboot_opt_backup)"
+    echo "  [99] $(msg leboot_update_title)"
     echo "  [0] $(msg leboot_back)"
     echo "=================================================="
     printf "Ваш выбор / Your choice: "
@@ -1107,6 +1169,7 @@ leboot_menu() {
     case "$choice" in
       1) flash_leboot ;;
       2) backup_fip ;;
+      99) check_leboot_updates ;;
       0) return ;;
       *) echo "$(msg invalid_input)" ;;
     esac
